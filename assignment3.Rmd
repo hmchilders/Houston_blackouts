@@ -269,7 +269,7 @@ buildings <- buildings %>%
 -   filter to homes within blackout areas\
 
     ```{r}
-    homes_within_blackout <- st_intersects(buildings, cropped_data)
+    homes_within_blackout <- st_intersection(areas_outside_buffer, buildings)
     ```
 
 -   count number of impacted homes\
