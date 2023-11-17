@@ -87,6 +87,7 @@ library(tmap)
 library(geodata)
 library(stars)
 library(sf)
+library(tidyverse)
 ```
 
 #### Find locations of blackouts
@@ -269,13 +270,13 @@ buildings <- buildings %>%
 -   filter to homes within blackout areas\
 
     ```{r}
-    homes_within_blackout <- st_intersection(areas_outside_buffer, buildings)
+    homes_within_blackout <- st_within(areas_outside_buffer, buildings)
     ```
 
 -   count number of impacted homes\
 
 ```{r include=TRUE}
-
+nrow(homes_within_blackout)
 ```
 
 #### Investigate socioeconomic factors
@@ -289,19 +290,54 @@ buildings <- buildings %>%
 -   hint: reproject data to EPSG:3083\
 
 ```{r include=TRUE}
+socioeconomic <- st_read('data/ACS_2019_5YR_TRACT_48_TEXAS.gdb/', layer = 'X19_INCOME')
+socioeconomic <- socioeconomic %>% 
+   dplyr::select(GEOID, B19013e1) %>% 
+  rename(GEOID_Data = GEOID,
+median_income = B19013e1) 
+```
 
+```{r}
+geometry <- st_read('data/ACS_2019_5YR_TRACT_48_TEXAS.gdb/', layer = "ACS_2019_5YR_TRACT_48_TEXAS")
+  
+socioeconomic <- st_read('data/ACS_2019_5YR_TRACT_48_TEXAS.gdb/', layer = 'X19_INCOME')
+socioeconomic <- socioeconomic %>% 
+   dplyr::select(GEOID, B19013e1) %>% 
+  rename(GEOID_Data = GEOID,
+median_income = B19013e1) 
 ```
 
 ##### determine which census tracts experienced blackouts (10 points)
 
 -   join the income data to the census tract geometries\
+
+    ```{r}
+    census_income <- left_join(geometry, socioeconomic) %>% 
+      st_transform('EPSG:3083')
+    ```
+
 -   hint: make sure to join by geometry ID\
--   spatially join census tract data with buildings determined to be impacted by blackouts\
+
+-   spatially join census tract data with buildings determined to be impacted by blackouts
+
+    ```{r}
+    Houston <- Houston %>% 
+      st_transform('EPSG:3083')
+    census_buildings <- st_intersection(cropped_data, census_income)
+
+    ```
+
 -   find which census tracts had blackouts\
 
 ```{r include=TRUE}
 
+census_blackouts <- unique(census_buildings$GEOID)
 
+
+```
+
+```{r}
+plot(census_buildings$geometry)
 ```
 
 ##### compare incomes of impacted tracts to unimpacted tracts (10 points)
@@ -309,3 +345,14 @@ buildings <- buildings %>%
 -   create a map of median income by census tract, designating which tracts had blackouts\
 -   plot the distribution of income in impacted and unimpacted tracts
 -   write approx. 100 words summarizing your results and discussing any limitations to this study
+
+```{r}
+final_map <- census_income[Houston,] 
+final_map_test <- st_filter(census_income, Houston, .pred = st_within)
+
+#tract_with_blackout <- st_join(census_buildings, final_map)
+
+ggplot()+
+ geom_sf(data = final_map, aes(fill = final_map$median_income))
+ # geom_point(data = final_map, color = 'red')
+```
