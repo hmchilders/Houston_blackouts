@@ -1,0 +1,134 @@
+---
+title: "Assignment 3 workflow"
+output: html_document
+date: "2023-11-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Exploring the Socioeconomic Impacts of the 2021 Blackout in Houston, Texas
+
+### Import Relevant Libraries
+
+```{r libraries for data analysis}
+library(terra)
+library(dplyr)
+library(spData)
+library(spDataLarge)
+library(tmap)
+library(geodata)
+library(stars)
+library(sf)
+library(tidyverse)
+```
+
+#### Style-guide libraries for grading purposes:
+
+```{r style libraries}
+library(styler)
+library(lintr)
+
+```
+
+## Read in the Data
+
+#### Nightlights Data:
+
+```{r pressure, echo=FALSE, }
+# Read in the Nightlights Data
+tile5_Feb7 <- read_stars("data/VNP46A1.A2021038.h08v05.001.2021039064328.tif") 
+tile6_Feb7 <- read_stars("data/VNP46A1.A2021038.h08v06.001.2021039064329.tif") 
+tile5_Feb16 <- read_stars("data/VNP46A1.A2021047.h08v05.001.2021048091106.tif") 
+tile6_Feb16 <- read_stars("data/VNP46A1.A2021047.h08v06.001.2021048091105.tif") 
+
+```
+
+```{r}
+#Check the class of each object to ensure the data was read in as a stars object
+class(tile5_Feb7)
+class(tile5_Feb16)
+class(tile6_Feb7)
+class(tile6_Feb16)
+```
+
+#### Highways Data:
+
+```{r}
+#Use a query to import highways data
+highway_query <- "SELECT * FROM gis_osm_roads_free_1 WHERE fclass='motorway'"
+#Use st_read to read in the highway data as a spatial object
+highways <- st_read("data/gis_osm_roads_free_1.gpkg", query = highway_query, quiet = TRUE)
+```
+
+#### Housing Data:
+
+```{r}
+#Use a query to import housing data
+building_query <- "SELECT* 
+FROM gis_osm_buildings_a_free_1
+WHERE (type IS NULL AND name IS NULL)
+OR type in ('residential', 'apartments', 'house', 'static_caravan', 'detached')"
+#Use st_read to read in the housing data as a spatial object
+buildings <-  st_read("data/gis_osm_buildings_a_free_1.gpkg", query = building_query, quiet = TRUE)
+```
+
+#### Socioeconomic Data:
+
+```{r}
+#Use st_read to read in the geometry layer of the socioeconomic data
+geometry <- st_read('data/ACS_2019_5YR_TRACT_48_TEXAS.gdb/', layer = "ACS_2019_5YR_TRACT_48_TEXAS")
+#Use st_read to read in the socioeconomic data
+socioeconomic <- st_read('data/ACS_2019_5YR_TRACT_48_TEXAS.gdb/', layer = 'X19_INCOME')
+```
+
+## Initial Data Exploration and Manipulation
+
+#### Nightlights Data: 
+
+```{r}
+#Combine tiles from the same day to create 2 comparable images
+#Use st_mosaic to combine the two stars objects
+Feb_7 = st_mosaic(tile5_Feb7, tile6_Feb7)
+Feb_16 = st_mosaic(tile5_Feb16, tile6_Feb16)
+```
+
+```{r}
+#Check that the data was combined properly by plotting the image
+plot(Feb_7)
+#Re-check the class of the new combined object
+class(Feb_7)
+#Check that the data was combined properly by plotting the image
+plot(Feb_16)
+#Re-check the class of the new combined object
+class(Feb_16)
+```
+
+#### Highway Data:
+
+```{r}
+#Check the CRS of the highways data
+crs(highways)
+#Transform the highways data to the EPSG 3083 projection
+highways <- highways %>% 
+  st_transform(crs = 'EPSG:3083')
+#Plot the initial data
+plot(highways$geom)
+#Add a 200m buffer around the highways so light coming from highways doesn't distort the data
+buffer <- highways %>% 
+  st_buffer(dist = 200)
+#Use st_union to join the highways data and the buffer into one cohesive geometry
+highways_with_buffer <- buffer %>% 
+  st_union()
+#Plot the highways data with the buffer to see the new data
+plot(highway_with_buffer)
+#NOTE: toggling between the original highway data and the highway with buffer data allows you to see the line thickness change
+#this ensures we actually made the buffer and added it to the geometry successfully
+```
+
+#### Socioeconomic Data: 
+
+```{r}
+
+```

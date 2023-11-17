@@ -333,6 +333,8 @@ median_income = B19013e1)
 
 census_blackouts <- unique(census_buildings$GEOID)
 
+BlackoutCentroids <- st_centroid(census_buildings)
+
 
 ```
 
@@ -342,7 +344,7 @@ plot(census_buildings$geometry)
 
 ##### compare incomes of impacted tracts to unimpacted tracts (10 points)
 
--   create a map of median income by census tract, designating which tracts had blackouts\
+-   create a map of median income by census tract, designating which tracts had blackouts
 -   plot the distribution of income in impacted and unimpacted tracts
 -   write approx. 100 words summarizing your results and discussing any limitations to this study
 
@@ -350,9 +352,19 @@ plot(census_buildings$geometry)
 final_map <- census_income[Houston,] 
 final_map_test <- st_filter(census_income, Houston, .pred = st_within)
 
+Centriods <- final_map %>% 
+  st_centriods()
+
 #tract_with_blackout <- st_join(census_buildings, final_map)
 
 ggplot()+
  geom_sf(data = final_map, aes(fill = final_map$median_income))
- # geom_point(data = final_map, color = 'red')
+ geom_point(data = BlackoutCentroids$geometry, color = 'red')
+```
+
+```{r}
+tm_shape(final_map)+
+  tm_fill(fill = "median_income")+
+  tm_shape(BlackoutCentroids)+
+  tm_dots(col = 'red')
 ```
