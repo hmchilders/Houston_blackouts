@@ -349,17 +349,15 @@ plot(census_buildings$geometry)
 -   write approx. 100 words summarizing your results and discussing any limitations to this study
 
 ```{r}
-final_map <- census_income[Houston,] 
-final_map_test <- st_filter(census_income, Houston, .pred = st_within)
+final_map_test <- st_crop(census_income, Houston)
 
-Centriods <- final_map %>% 
-  st_centriods()
+#Centriods <- final_map %>% 
+  #st_centroid()
 
 #tract_with_blackout <- st_join(census_buildings, final_map)
 
 ggplot()+
- geom_sf(data = final_map, aes(fill = final_map$median_income))
- geom_point(data = BlackoutCentroids$geometry, color = 'red')
+ geom_sf(data = final_map_test, aes(fill = median_income))
 ```
 
 ```{r}
