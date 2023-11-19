@@ -276,7 +276,7 @@ buildings <- buildings %>%
 -   count number of impacted homes\
 
 ```{r include=TRUE}
-nrow(homes_within_blackout)
+unique(homes_within_blackout$geom)
 ```
 
 #### Investigate socioeconomic factors

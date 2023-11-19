@@ -1,5 +1,6 @@
 ---
 title: "Assignment 3 workflow"
+author/collab: Heather Childers & Sofia Ingersoll
 output: html_document
 date: "2023-11-17"
 ---
@@ -55,6 +56,8 @@ class(tile6_Feb16)
 
 #### Highways Data:
 
+We'll be using queries to to access data from available databases. SQL is a Standardized Query Language that allows users on different operating systems and programming languages to access relational databases. The queries are the commands that access the data.
+
 ```{r}
 #Use a query to import highways data
 highway_query <- "SELECT * FROM gis_osm_roads_free_1 WHERE fclass='motorway'"
@@ -85,7 +88,7 @@ socioeconomic <- st_read('data/ACS_2019_5YR_TRACT_48_TEXAS.gdb/', layer = 'X19_I
 
 ## Initial Data Exploration and Manipulation
 
-#### Nightlights Data: 
+#### Nightlights Data:
 
 ```{r}
 #Combine tiles from the same day to create 2 comparable images
@@ -99,10 +102,12 @@ Feb_16 = st_mosaic(tile5_Feb16, tile6_Feb16)
 plot(Feb_7)
 #Re-check the class of the new combined object
 class(Feb_7)
+
 #Check that the data was combined properly by plotting the image
 plot(Feb_16)
 #Re-check the class of the new combined object
 class(Feb_16)
+
 ```
 
 #### Highway Data:
@@ -127,7 +132,7 @@ plot(highways_with_buffer)
 #this ensures we actually made the buffer and added it to the geometry successfully
 ```
 
-#### Socioeconomic Data: 
+#### Socioeconomic Data:
 
 ```{r}
 #Select only the GEOID and Median Income columns from the imported socioeconomic data
@@ -141,7 +146,7 @@ socioeconomic <- socioeconomic %>%
 
 ```{r}
 #Check the CRS of the original Geometry
-#crs(geometry)
+crs(geometry)
 #Join the geometery layer to the Census tract and Median Income data
 #Reproject the data to the EPSG 3083 projection
 census_income <- left_join(geometry, socioeconomic) %>% 
@@ -149,4 +154,140 @@ census_income <- left_join(geometry, socioeconomic) %>%
 
 #Check that the data joined correctly by viewing the head of the data
 head(census_income)
+```
+
+## Task 1: Finding the locations of Blackouts
+
+We'll start by creating a blackout mask:
+
+```{r}
+#find the change in night lights intensity (presumably) caused by the storm
+#assume that any location that experienced a drop of more than 200 nW cm-2sr-1 experienced a blackout
+mask <- (Feb_7 - Feb_16) > 200
+
+#assign NA to all locations that experienced a drop of less than 200 nW cm-2sr-1
+mask[mask == FALSE] = NA
+```
+
+Then vectorize the mask:
+
+```{r}
+#use st_as_sf() to vectorize the blackout mask
+blackout <- st_as_sf(mask)
+#fix any invalid geometries using st_make_valid
+blackout<- st_make_valid(blackout)
+```
+
+Finally, crop the vectorized map to our region of interest:
+
+NOTE: We will assume the boundary of Houston can be defined by the following coordinates:
+
+-   (-96.5, 29), (-96.5, 30.5), (-94.5, 30.5), (-94.5, 29)
+
+```{r}
+#turn these coordinates into a polygon using st_polygon
+Houston <- st_polygon(list(rbind(c(-96.5, 29),c(-96.5, 30.5),c(-94.5, 30.5), c(-94.5, 29),c(-96.5, 29))))
+#convert the polygon into a simple feature collection using st_sfc() and assign a CRS
+Houston <- st_sfc(Houston) %>% 
+  st_set_crs(4326)
+```
+
+```{r}
+#crop (spatially subset) the blackout mask to our region of interest
+cropped_mask<- st_crop(blackout,Houston)
+#Use the plot function to see that your data has been subsetted
+ggplot()+
+  geom_sf(data = cropped_mask$geometry)
+#re-project the cropped blackout dataset to EPSG:3083 (NAD83 / Texas Centric Albers Equal Area)
+cropped_mask <- cropped_mask %>% 
+  st_transform('EPSG:3083') %>% 
+  st_make_valid()
+
+
+```
+
+To avoid mistaking differences in traffic for a blackout, remove the highways from the mask:
+
+```{r}
+#Use st_difference to select the areas that are within the cropped mask and outside the buffer
+cropped_mask_no_highways <- st_difference(cropped_mask,highways_with_buffer)
+#check to see that the subset worked by comparing the number of observations in each dataset:
+print(nrow(cropped_mask))
+print(nrow(cropped_mask_no_highways))
+```
+
+Note: there are 7256 observations in our original dataset, and there are only 7247 observations in the new dataset.
+
+## Find homes impacted by blackouts
+
+```{r}
+#Reproject the buildings data to be the same CRS
+buildings <- buildings %>% 
+  st_transform('EPSG:3083')
+#Use st_within to select buildings that are within our blackout mask
+homes_with_blackouts <- st_intersection(buildings,cropped_mask_no_highways)
+```
+
+```{r}
+#check the new data by plotting the homes with blackouts
+plot(homes_with_blackouts$geom)
+```
+
+```{r}
+nrow(unique(homes_with_blackouts$geom))
+```
+
+## Investigate socioeconomic factors
+
+Find which census tracts had blackouts:
+
+```{r}
+Houston <- Houston %>% 
+  st_transform('EPSG:3083')
+
+census_houston <- st_crop(census_income, Houston)
+
+plot(census_houston$Shape)
+```
+
+```{r}
+combined <- st_join(census_houston, homes_with_blackouts, left = TRUE)
+combined$VNP46A1.A2021038.h08v05.001.2021039064328.tif[is.na(combined$VNP46A1.A2021038.h08v05.001.2021039064328.tif)] <- "FALSE" 
+
+# Census tracts that experienced blackout
+#blackout_census <- st_join(homes_with_blackouts, census_income, by = geom) %>%
+ # mutate(blackout = 'yes')
+```
+
+```{r}
+trac_with_blackout <- combined %>% 
+  filter(combined$VNP46A1.A2021038.h08v05.001.2021039064328.tif == TRUE)
+
+trac_without_blackout <- combined %>% 
+  filter(combined$VNP46A1.A2021038.h08v05.001.2021039064328.tif == FALSE)
+```
+
+-   create a map of median income by census tract, designating which tracts had blackouts
+-   plot the distribution of income in impacted and unimpacted tracts
+-   write approx. 100 words summarizing your results and discussing any limitations to this study
+
+```{r}
+ggplot()+
+ geom_sf(data = combined$VNP46A1.A2021038.h08v05.001.2021039064328.tif == 'TRUE', aes(fill = median_income))
+```
+
+```{r}
+#Create a map of median income by census tract, designating which tracts had blackouts
+tm_shape(census_houston) + 
+  tm_polygons("median_income", 
+          title = "Median Income ($)",
+          palette = "magma") +
+  tm_shape(trac_with_blackout) +
+  tm_dots() 
+```
+
+```{r}
+ggplot(combined, aes(x=VNP46A1.A2021038.h08v05.001.2021039064328.tif, y=median_income))+
+  geom_boxplot()
+
 ```
