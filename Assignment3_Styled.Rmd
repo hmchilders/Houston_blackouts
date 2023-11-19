@@ -234,47 +234,52 @@ plot(homes_with_blackouts$geom)
 ```
 
 ```{r}
-nrow(unique(homes_with_blackouts$geom))
+#Find how many homes were affected
+nrow(homes_with_blackouts)
 ```
+
+There were 168,874 homes affected by the blackouts in Houston.
 
 ## Investigate socioeconomic factors
 
 Find which census tracts had blackouts:
 
 ```{r}
+#Check the CRS of the census_income data
+crs(census_income)
+#Check the CRS of the houston polygon
+crs(Houston)
+#Transform the Houston Polygon to the same CRS as the census income info
 Houston <- Houston %>% 
   st_transform('EPSG:3083')
 
+# Use st_crop to crop the Texas Census Data to Houston Boundaries
 census_houston <- st_crop(census_income, Houston)
 
+#Plot the data to check it's cropped
 plot(census_houston$Shape)
 ```
 
 ```{r}
+#Combine the Census data with the blackout data, set available values equal to ture
 combined <- st_join(census_houston, homes_with_blackouts, left = TRUE)
+#Set the NA Values equal to False
 combined$VNP46A1.A2021038.h08v05.001.2021039064328.tif[is.na(combined$VNP46A1.A2021038.h08v05.001.2021039064328.tif)] <- "FALSE" 
 
-# Census tracts that experienced blackout
-#blackout_census <- st_join(homes_with_blackouts, census_income, by = geom) %>%
- # mutate(blackout = 'yes')
+
+
 ```
 
 ```{r}
+#Create a new variable to identify just the tracts that experienced blackouts
 trac_with_blackout <- combined %>% 
   filter(combined$VNP46A1.A2021038.h08v05.001.2021039064328.tif == TRUE)
-
+##Create a new variable to identify just the tracts that didnt experience blackouts
 trac_without_blackout <- combined %>% 
   filter(combined$VNP46A1.A2021038.h08v05.001.2021039064328.tif == FALSE)
 ```
 
 -   create a map of median income by census tract, designating which tracts had blackouts
--   plot the distribution of income in impacted and unimpacted tracts
--   write approx. 100 words summarizing your results and discussing any limitations to this study
-
-```{r}
-ggplot()+
- geom_sf(data = combined$VNP46A1.A2021038.h08v05.001.2021039064328.tif == 'TRUE', aes(fill = median_income))
-```
 
 ```{r}
 #Create a map of median income by census tract, designating which tracts had blackouts
@@ -284,10 +289,35 @@ tm_shape(census_houston) +
           palette = "magma") +
   tm_shape(trac_with_blackout) +
   tm_dots() 
+
 ```
 
 ```{r}
+  tm_shape(trac_with_blackout) +
+  tm_polygons("median_income", 
+          title = "Median Income ($)",
+          palette = "RdPu") 
+```
+
+```{r}
+  tm_shape(trac_without_blackout) +
+  tm_polygons("median_income", 
+          title = "Median Income ($)",
+          palette = "RdPu") 
+```
+
+-   
+-   plot the distribution of income in impacted and unimpacted tracts
+
+```{r}
 ggplot(combined, aes(x=VNP46A1.A2021038.h08v05.001.2021039064328.tif, y=median_income))+
-  geom_boxplot()
+  geom_boxplot()+
+  labs(x = "Experienced a Blackout",
+       y = 'Median Income ($)',
+       title = "Median Income spearated by Blackout Status")
 
 ```
+
+-   write approx. 100 words summarizing your results and discussing any limitations to this study
+
+This distribution was originally surprising to me because I expected there to be some information about lower-income census tracts being affected by the blackouts. I noticed from this data that so many buildings were affected by the blackouts; they weren't based on income. The income from the census tracts that didn't experience a blackout was lower than the census tracts that did because so few census tracts avoided the blackouts. The main limitation that I could identify in this study is that the original data wasn\'t available in the same projection. In order to join the spatial data, we had to reproject the data, which required the use of the st_make_valid() function in a few places in order for the code to run. Ideally, we could find data that was available in the same projection, so the geometries were more consistent.
