@@ -25,14 +25,6 @@ library(sf)
 library(tidyverse)
 ```
 
-#### Style-guide libraries for grading purposes:
-
-```{r style libraries}
-library(styler)
-library(lintr)
-
-```
-
 ## Read in the Data
 
 #### Nightlights Data:
@@ -306,8 +298,6 @@ tm_shape(census_houston) +
           palette = "RdPu") 
 ```
 
--   
-
 -   plot the distribution of income in impacted and unimpacted tracts
 
 ```{r}
@@ -318,7 +308,5 @@ ggplot(combined, aes(x=VNP46A1.A2021038.h08v05.001.2021039064328.tif, y=median_i
        title = "Median Income spearated by Blackout Status")
 
 ```
-
--   write approx. 100 words summarizing your results and discussing any limitations to this study
 
 This distribution was originally surprising to me because I expected there to be some information about lower-income census tracts being affected by the blackouts. I noticed from this data that so many buildings were affected by the blackouts; they weren't based on income. The income from the census tracts that didn't experience a blackout was lower than the census tracts that did because so few census tracts avoided the blackouts. The main limitation that I could identify in this study is that the original data wasn't available in the same projection. In order to join the spatial data, we had to reproject the data, which required the use of the st_make_valid() function in a few places in order for the code to run. Ideally, we could find data that was available in the same projection, so the geometries were more consistent.
